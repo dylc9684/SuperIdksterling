@@ -138,6 +138,24 @@
       flex-wrap: wrap;
     }
 
+    .level-picker {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 0 0 16px;
+      color: #f2dfb5;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .level-options {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
     button {
       appearance: none;
       border: 1px solid rgba(255, 255, 255, 0.18);
@@ -149,6 +167,22 @@
       padding: 10px 14px;
       cursor: pointer;
       box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+    }
+
+    .level-option {
+      width: 38px;
+      height: 38px;
+      padding: 0;
+      display: grid;
+      place-items: center;
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff8e8;
+    }
+
+    .level-option.active {
+      background: linear-gradient(180deg, #ffe28a, #d97b2c);
+      color: #1d1205;
+      border-color: rgba(255, 255, 255, 0.42);
     }
 
     button.secondary {
@@ -242,6 +276,16 @@
       <div class="menu-panel">
         <h1 class="menu-title" id="overlayTitle">Peanut Butter Stick Quest</h1>
         <p class="menu-copy" id="overlayCopy">Controls: Arrow keys or A/D move, Space/W/Up jump, F/X/K/Shift attack after powerups. Boss at level 3 and 5.</p>
+        <div class="level-picker" id="levelPicker">
+          <span>Start Level</span>
+          <div class="level-options" aria-label="Choose start level">
+            <button class="level-option active" type="button" data-level-select="0">1</button>
+            <button class="level-option" type="button" data-level-select="1">2</button>
+            <button class="level-option" type="button" data-level-select="2">3</button>
+            <button class="level-option" type="button" data-level-select="3">4</button>
+            <button class="level-option" type="button" data-level-select="4">5</button>
+          </div>
+        </div>
         <div class="menu-actions">
           <button id="startBtn">Play</button>
           <button class="secondary" id="resetBtn">Reset</button>
@@ -268,6 +312,7 @@
       const overlayCopy = document.getElementById("overlayCopy");
       const startBtn = document.getElementById("startBtn");
       const resetBtn = document.getElementById("resetBtn");
+      const levelButtons = [...document.querySelectorAll("[data-level-select]")];
 
       const VIEW_W = 960;
       const VIEW_H = 540;
@@ -710,7 +755,8 @@
         screenShake: 0,
         winTimer: 0,
         carryPower: "small",
-        carryStoredPower: "pb"
+        carryStoredPower: "pb",
+        startLevelIndex: 0
       };
 
       function makePlayer(x, y) {
@@ -1138,18 +1184,30 @@
       const levelFactories = [createLevelOne, createLevelTwo, createLevelThree, createLevelFour, createLevelFive];
 
       function loadLevel(index) {
-        game.levelIndex = index;
-        game.level = levelFactories[index]();
+        const safeIndex = clamp(index, 0, levelFactories.length - 1);
+        game.levelIndex = safeIndex;
+        game.level = levelFactories[safeIndex]();
         game.player = makePlayer(game.level.spawn.x, game.level.spawn.y);
         applyCarriedPower(game.player);
         game.cameraX = 0;
-        game.levelMessage = `LEVEL ${index + 1}: ${game.level.name}`;
+        game.levelMessage = `LEVEL ${safeIndex + 1}: ${game.level.name}`;
         game.levelMessageTimer = 2.4;
         input.prevJump = false;
         input.prevAttack = false;
         keys.clear();
         playSfx("levelStart", 0.7);
         updateMusic(true);
+      }
+
+      function setStartLevel(index, preview = false) {
+        game.startLevelIndex = clamp(Number(index) || 0, 0, levelFactories.length - 1);
+        for (const button of levelButtons) {
+          button.classList.toggle("active", Number(button.dataset.levelSelect) === game.startLevelIndex);
+        }
+        if (preview) {
+          loadLevel(game.startLevelIndex);
+          updateHud();
+        }
       }
 
       function startGame() {
@@ -1162,7 +1220,7 @@
         game.winTimer = 0;
         game.carryPower = "small";
         game.carryStoredPower = "pb";
-        loadLevel(0);
+        loadLevel(game.startLevelIndex);
       }
 
       function showOverlay(title, copy, primaryText = "Play") {
@@ -1182,6 +1240,12 @@
       });
 
       resetBtn.addEventListener("click", startGame);
+
+      levelButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          setStartLevel(button.dataset.levelSelect, game.mode !== "playing");
+        });
+      });
 
       function solidsForLevel(level) {
         const blocks = level.blocks.filter((block) => block.alive && block.solid);
